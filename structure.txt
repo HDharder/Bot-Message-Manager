@@ -1,0 +1,9 @@
+Epic Quest Bot/
+├── node_modules/       (gerado automaticamente)
+├── src/
+│   ├── database.js     (conexão e rotinas do SQLite)
+│   └── index.js        (arquivo principal do bot - faremos depois)
+├── .env                (para guardar o token do bot de forma segura)
+├── database.sqlite     (gerado automaticamente pelo SQLite)
+├── discloud.config     (configuração da hospedagem)
+└── package.json        (dependências do projeto)
