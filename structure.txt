@@ -1,9 +1,10 @@
-Epic Quest Bot/
-├── node_modules/       (gerado automaticamente)
+Bot-Message-Manager/
+├── node_modules/       (Generated automatically by npm - ignored by Git)
 ├── src/
-│   ├── database.js     (conexão e rotinas do SQLite)
-│   └── index.js        (arquivo principal do bot - faremos depois)
-├── .env                (para guardar o token do bot de forma segura)
-├── database.sqlite     (gerado automaticamente pelo SQLite)
-├── discloud.config     (configuração da hospedagem)
-└── package.json        (dependências do projeto)
+│   ├── database.js     (SQLite database connection and automated cleanup routines)
+│   └── index.js        (Main bot file containing the core logic and configurations)
+├── .env                (Stores sensitive data like the bot token safely - ignored by Git)
+├── .gitignore          (Tells Git which files and folders to avoid uploading)
+├── database.sqlite     (Generated automatically by SQLite - ignored by Git)
+├── package.json        (Project dependencies and scripts)
+└── README.md           (Project documentation and setup instructions)
