@@ -1,7 +1,6 @@
 /**
  * @file database.js
  * @description Handles the SQLite database connection, schema initialization, and automated cleanup routines.
- * Designed to be lightweight and strictly adhere to cloud-hosting constraints (like Discloud).
  */
 
 const sqlite3 = require('sqlite3').verbose();
@@ -28,6 +27,7 @@ const db = new sqlite3.Database('./database.sqlite', (err) => {
  * - delete_count: Tracks how many times the user abused the correction window.
  */
 function initDatabase() {
+    // 1. Table for active posts (cleaned up every 48h)
     db.run(`CREATE TABLE IF NOT EXISTS posts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id TEXT NOT NULL,
@@ -36,11 +36,17 @@ function initDatabase() {
         timestamp INTEGER NOT NULL,
         delete_count INTEGER DEFAULT 0
     )`, (err) => {
-        if (err) {
-            console.error('Error creating table:', err.message);
-        } else {
-            console.log('Table "posts" is ready for use.');
-        }
+        if (err) console.error('Error creating posts table:', err.message);
+        else console.log('Table "posts" is ready for use.');
+    });
+
+    // 2. Table for permanent infraction tracking
+    db.run(`CREATE TABLE IF NOT EXISTS user_infractions (
+        user_id TEXT PRIMARY KEY,
+        infraction_count INTEGER DEFAULT 0
+    )`, (err) => {
+        if (err) console.error('Error creating infractions table:', err.message);
+        else console.log('Table "user_infractions" is ready for use.');
     });
 }
 
@@ -56,12 +62,9 @@ function startCleanup(cooldownHours) {
         const cooldownMs = Date.now() - (cooldownHours * 60 * 60 * 1000);
 
         db.run(`DELETE FROM posts WHERE timestamp < ?`, [cooldownMs], function(err) {
-            if (err) {
-                console.error('Error cleaning up old records:', err.message);
-            } else if (this.changes > 0) {
-                // this.changes returns the number of rows deleted by the query
-                console.log(`Auto-cleanup: ${this.changes} old record(s) deleted.`);
-            }
+            if (err) console.error('Error cleaning up old records:', err.message);
+            // this.changes returns the number of rows deleted by the query
+            else if (this.changes > 0) console.log(`Auto-cleanup: ${this.changes} old record(s) deleted.`);
         });
     }
 
@@ -70,9 +73,35 @@ function startCleanup(cooldownHours) {
     setInterval(cleanOldRecords, 3600000);
 }
 
-// Execute the schema creation immediately when the file is imported
+/**
+ * 1.1: Registers a new infraction for a user and returns their total count.
+ * @param {string} userId - The Discord ID of the user.
+ * @returns {Promise<number>} The updated total number of infractions.
+ */
+function registerInfraction(userId) {
+    return new Promise((resolve, reject) => {
+        db.get(`SELECT infraction_count FROM user_infractions WHERE user_id = ?`, [userId], (err, row) => {
+            if (err) return reject(err);
+            
+            if (row) {
+                // User exists, increment their count
+                const newCount = row.infraction_count + 1;
+                db.run(`UPDATE user_infractions SET infraction_count = ? WHERE user_id = ?`, [newCount, userId], (err) => {
+                    if (err) reject(err);
+                    else resolve(newCount);
+                });
+            } else {
+                // First time offender
+                db.run(`INSERT INTO user_infractions (user_id, infraction_count) VALUES (?, 1)`, [userId], (err) => {
+                    if (err) reject(err);
+                    else resolve(1);
+                });
+            }
+        });
+    });
+}
+
 initDatabase();
 
-// Export both the database instance (to run queries in index.js) 
-// and the cleanup function (to be triggered with the dynamic config)
-module.exports = { db, startCleanup };
+// Export the new registerInfraction function as well
+module.exports = { db, startCleanup, registerInfraction };

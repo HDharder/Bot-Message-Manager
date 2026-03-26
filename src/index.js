@@ -6,7 +6,8 @@
 
 require('dotenv').config();
 const { Client, GatewayIntentBits, Events, AttachmentBuilder } = require('discord.js');
-const { db, startCleanup } = require('./database');
+// 1.1: Imported registerInfraction
+const { db, startCleanup, registerInfraction } = require('./database'); 
 const stringSimilarity = require('string-similarity');
 
 // --- BOT CONFIGURATION ---
@@ -163,23 +164,27 @@ client.on(Events.MessageCreate, async (message) => {
         if (isSpam) {
             await message.delete().catch(console.error);
 
-            // Send temporary warning in the channel
-            const warningMsg = await message.channel.send(`⚠️ <@${userId}>, you cannot post this session right now. Please wait ${CONFIG.COOLDOWN_HOURS} hours or you have exceeded the correction limit!`);
+            // 1.1: Register infraction and get the total count
+            const totalInfractions = await registerInfraction(userId).catch(() => 1);
+
+            // Send temporary warning including the infraction count
+            const warningMsg = await message.channel.send(`⚠️ <@${userId}>, you cannot post this session right now. Please wait ${CONFIG.COOLDOWN_HOURS} hours or you have exceeded the correction limit! (This is your **${totalInfractions}º** infraction)`);
             
             // Delete warning message after configured time
             setTimeout(() => warningMsg.delete().catch(console.error), (CONFIG.WARNING_DELETE_SECONDS * 1000));
 
-            console.log(`🚫 Spam/Abuse blocked from: ${message.author.username}`);
+            console.log(`🚫 Spam/Abuse blocked from: ${message.author.username} | Total Infractions: ${totalInfractions}`);
 
             // Generate an audit log file for the staff
             const staffChannel = client.channels.cache.get(CONFIG.STAFF_CHANNEL_ID);
             if (staffChannel) {
-                const logText = `USER: ${message.author.tag} (${userId})\n\n=== OLD TEXT ===\n${oldPostRecord.content}\n\n=== NEW TEXT (BLOCKED) ===\n${content}`;
+                // 1.1: Added infraction info to the text file inside
+                const logText = `USER: ${message.author.tag} (${userId})\nTOTAL INFRACTIONS: ${totalInfractions}\n\n=== OLD TEXT ===\n${oldPostRecord.content}\n\n=== NEW TEXT (BLOCKED) ===\n${content}`;
                 const buffer = Buffer.from(logText, 'utf-8');
                 const attachment = new AttachmentBuilder(buffer, { name: `spam_log_${message.author.username}.txt` });
 
                 staffChannel.send({ 
-                    content: `🚨 **Spam Filter Triggered!**\nUser <@${userId}> attempted to bypass the ${CONFIG.COOLDOWN_HOURS}h/Correction rule in <#${message.channel.id}>.`,
+                    content: `🚨 **Spam Filter Triggered!**\nUser <@${userId}> attempted to bypass the ${CONFIG.COOLDOWN_HOURS}h rule in <#${message.channel.id}>.\n📊 **Total Rule Violations:** ${totalInfractions}`,
                     files: [attachment]
                 });
             }
